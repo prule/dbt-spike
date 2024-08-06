@@ -1,0 +1,28 @@
+
+version: 2
+
+models:
+  - name: addresses_bronze
+    description: "addresses"
+    columns:
+      - name: company_id
+        description: ""
+        data_tests:
+          - not_null
+      - name: address
+        description: ""
+        data_tests:
+          - not_null
+      - name: total_spend
+        description: ""
+        data_tests:
+          - not_null
+
+  - name: cities_bronze
+    description: "cities"
+    columns:
+      - name: city
+        description: ""
+        data_tests:
+          - unique
+          - not_null

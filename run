@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+case "$1" in
+
+  'data:download')
+    echo ""
+    echo "Downloading data"
+    mkdir -p /tmp/data/downloaded
+#https://github.com/davidasboth/solve-any-data-analysis-problem/blob/a2612923f23c15dcefbb482a5806861faed0ae51/chapter-2/data/addresses.csv
+    curl "https://raw.githubusercontent.com/davidasboth/solve-any-data-analysis-problem/a2612923f23c15dcefbb482a5806861faed0ae51/chapter-2/data/addresses.csv" \
+    -o "/tmp/data/downloaded/addresses.csv"
+    curl "https://raw.githubusercontent.com/davidasboth/solve-any-data-analysis-problem/a2612923f23c15dcefbb482a5806861faed0ae51/chapter-2/data/cities.csv" \
+    -o "/tmp/data/downloaded/cities.csv"
+    echo ""
+    ;;
+
+  'data:load')
+    echo ""
+    echo "Loading data"
+
+    psql -h localhost -d postgres -U postgres \
+     -c "create table if not exists dbt_postgres.addresses (company_id text, address text, total_spend text)" \
+     -c "\copy dbt_postgres.addresses (company_id,address,total_spend)  from '/tmp/data/downloaded/addresses.csv' delimiters ',' CSV header quote as '\"'" \
+     -c "create table if not exists dbt_postgres.cities (city text);" \
+     -c "\copy dbt_postgres.cities (city)  from '/tmp/data/downloaded/cities.csv' delimiters ',' CSV"
+
+    ;;
+
+  *)
+    echo -e ""
+    echo "Usage:"
+    echo ""
+    echo "$(tput setaf 5)    $me$(tput sgr0) $(tput setaf 3)<command>$(tput sgr0)"
+    echo ""
+    echo "Commands:"
+    echo ""
+
+    echo "$(tput setaf 3)    data:download                            $(tput sgr0)      Download external data to ./data for reference-app-2"
+    echo "$(tput setaf 3)    data:load                                $(tput sgr0)      Load data into postgres"
+
+esac
