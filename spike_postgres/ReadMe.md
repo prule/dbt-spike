@@ -334,7 +334,26 @@ After fixing that, and doing a `dbt run` to recreate the views, a `dbt test` now
 07:30:16  Done. PASS=6 WARN=0 ERROR=0 SKIP=0 TOTAL=6
 ```
 
-There's still a lot more to do, but that's enough for today's post. 
+And now to check the results against the reference implementation:
+
+```sql
+select sum(SUM) from dbt_postgres_gold.spend_by_city_gold ;
+-- expected 490374100
+-- actual   490374100
+
+select sum(SUM) from dbt_postgres_gold.spend_by_city_gold where city in ('LONDON');
+-- EXPECTED 103042800
+-- ACTUAL   103042800
+
+select sum(SUM) from dbt_postgres_gold.spend_by_city_gold where city not in ('LONDON');
+-- expected 387331300
+-- actual   387331300
+
+select sum(SUM) from dbt_postgres_gold.spend_by_city_gold where city not in ('LONDON','OTHER')
+-- expected 119468400
+-- actual   118044200
+```
+There is a small discrepancy in the last number which warrants looking into in more detail - but there's still a lot more to do, and that's enough for today's post. 
 
 ### Resources:
 - Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
