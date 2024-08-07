@@ -52,6 +52,19 @@ case "$1" in
     echo ""
     echo "Running tests"
     dbt test
+    ;;
+
+  'test:data')
+    echo ""
+    echo "Running unit tests"
+    dbt test --select test_type:data
+
+    ;;
+
+  'test:unit')
+    echo ""
+    echo "Running unit tests"
+    dbt test --select test_type:unit
 
     ;;
 
@@ -67,5 +80,8 @@ case "$1" in
     echo "$(tput setaf 3)    data:download                            $(tput sgr0)      Download external data to ./data for reference-app-2"
     echo "$(tput setaf 3)    data:load                                $(tput sgr0)      Load data into postgres"
     echo "$(tput setaf 3)    docs                                     $(tput sgr0)      Generate documentation"
+    echo "$(tput setaf 3)    test                                     $(tput sgr0)      Run all tests"
+    echo "$(tput setaf 3)    test:data                                $(tput sgr0)      Run data tests"
+    echo "$(tput setaf 3)    test:unit                                $(tput sgr0)      Run unit tests"
 
 esac

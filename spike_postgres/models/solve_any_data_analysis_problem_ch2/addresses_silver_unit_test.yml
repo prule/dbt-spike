@@ -1,0 +1,19 @@
+#  https://docs.getdbt.com/reference/resource-properties/unit-tests
+
+unit_tests:
+  - name: when_no_city_is_mapped_city_should_be_other # this is the unique name of the test
+    model: addresses_silver # name of the model I'm unit testing
+    given: # the mock data for your inputs
+      - input: ref('cities_silver')
+        rows:
+          - {city: 'CITY1'}
+      - input: ref('addresses_bronze')
+        rows:
+          - {company_id: 'id1', address: "addr1,\ncity1, country", total_spend: 1}
+          - {company_id: 'id2', address: "addr2, \ncity2, country", total_spend: 2}
+    expect: # the expected output given the inputs above
+      rows:
+        - {company_id: 'id1', address: "ADDR1,\nCITY1, COUNTRY", total_spend: 1, city: 'CITY1'}
+        - {company_id: 'id2', address: "ADDR2, \nCITY2, COUNTRY", total_spend: 2, city: 'OTHER'}
+
+

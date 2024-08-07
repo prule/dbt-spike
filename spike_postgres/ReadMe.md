@@ -1,7 +1,7 @@
 Introduction
 ===
 
-In this project, I'll be taking my first steps with [DBT](https://www.getdbt.com). I'll be following the use case from [Solve any data analysis problem, Chapter 2](https://github.com/davidasboth/solve-any-data-analysis-problem/blob/main/chapter-2/Chapter%202%20example%20solution.ipynb) as I did before, but this time I'll be using DBT.
+In this project, I'll be taking my first steps with [DBT](https://www.getdbt.com). I'll be following the use case from [Solve any data analysis problem, Chapter 2](https://github.com/davidasboth/solve-any-data-analysis-problem/blob/main/chapter-2/Chapter%202%20example%20solution.ipynb) as I did [before](https://open.substack.com/pub/paulr70/p/data-processing-experiment-part-17?r=3ieyr&utm_campaign=post&utm_medium=web), but this time I'll be using DBT.
 
 DBT allows me to implement data transforms as a collection of SQL scripts which can be easily run in a simple and consistent manner. I'll use DBT with postgres since that's an easy starting point for me.
 
@@ -23,7 +23,7 @@ This creates a python virtual environment for this project, activates it, and in
 
 Then I'll create a new DBT project:
 ```shell
-(venv) paulrule@Pauls-MacBook-Air dbt-spike % dbt init
+(venv) paul@Pauls-MacBook-Air dbt-spike % dbt init
 02:49:07  Running with dbt=1.8.4
 Enter a name for your project (letters, digits, underscore): spike_postgres
 02:49:26
@@ -56,10 +56,10 @@ pass (dev password):
 dbname (default database that dbt will build objects in): postgres
 schema (default schema that dbt will build objects in): public
 threads (1 or more) [1]:
-02:50:05  Profile spike_postgres written to /Users/paulrule/.dbt/profiles.yml using target's profile_template.yml and your supplied values. Run 'dbt debug' to validate the connection.
+02:50:05  Profile spike_postgres written to /Users/paul/.dbt/profiles.yml using target's profile_template.yml and your supplied values. Run 'dbt debug' to validate the connection.
 ```
 A new DBT project is created in the directory `spike_postgres`.
-These details have been saved in `/Users/paulrule/.dbt/profiles.yml` and I can verify the connection with `dbt debug`:
+These details have been saved in `/Users/paul/.dbt/profiles.yml` and I can verify the connection with `dbt debug`:
 
 ```shell
 % cd spike_postgres
@@ -67,11 +67,11 @@ These details have been saved in `/Users/paulrule/.dbt/profiles.yml` and I can v
 00:15:02  Running with dbt=1.8.4
 00:15:02  dbt version: 1.8.4
 00:15:02  python version: 3.10.12
-00:15:02  python path: /Users/paulrule/IdeaProjects/dbt-spike/venv/bin/python
+00:15:02  python path: /Users/paul/IdeaProjects/dbt-spike/venv/bin/python
 00:15:02  os info: macOS-14.5-arm64-arm-64bit
-00:15:02  Using profiles dir at /Users/paulrule/.dbt
-00:15:02  Using profiles.yml file at /Users/paulrule/.dbt/profiles.yml
-00:15:02  Using dbt_project.yml file at /Users/paulrule/IdeaProjects/dbt-spike/spike_postgres/dbt_project.yml
+00:15:02  Using profiles dir at /Users/paul/.dbt
+00:15:02  Using profiles.yml file at /Users/paul/.dbt/profiles.yml
+00:15:02  Using dbt_project.yml file at /Users/paul/IdeaProjects/dbt-spike/spike_postgres/dbt_project.yml
 00:15:02  adapter type: postgres
 00:15:02  adapter version: 1.8.2
 00:15:02  Configuration:
@@ -353,7 +353,146 @@ select sum(SUM) from dbt_postgres_gold.spend_by_city_gold where city not in ('LO
 -- expected 119468400
 -- actual   118044200
 ```
-There is a small discrepancy in the last number which warrants looking into in more detail - but there's still a lot more to do, and that's enough for today's post. 
+There is a small discrepancy in the last number which warrants looking into in more detail later.
+
+---
+
+## Adding unit tests
+
+In the [addresses_silver.sql](spike_postgres/models/solve_any_data_analysis_problem_ch2/addresses_silver.sql) model I've got some logic where it adds a city column, and it tries to find a matching value from the cities table - if nothing matches, then city should be set to "OTHER". 
+
+```sql
+    coalesce(
+        (select city from {{ ref('cities_silver') }} where UPPER(address) like '%'||chr(10)||city||',%' order by city desc limit 1),
+         'OTHER'
+    ) as city
+```
+I'm going to add a unit test to check that this logic works as expected.
+
+Since I'm using DBT 1.8 I can add unit tests as described [here](https://docs.getdbt.com/reference/resource-properties/unit-tests) - I just need a YAML file in the models folder which:
+
+- has a unique name for each unit test
+- identifies the model being tested
+- defines some input data (unit tests don't use the real data as we are testing LOGIC)
+- defines the expected output
+
+So in [models/solve_any_data_analysis_problem_ch2/addresses_silver_unit_test.yml](models/solve_any_data_analysis_problem_ch2/addresses_silver_unit_test.yml) I define a test `when_no_city_is_mapped_city_should_be_other`.
+
+Since the model under test references `cities_silver` and `addresses_bronze` I define the contents of these views as
+mock data:
+- the contents of the `cities_silver` view contains 1 row, 
+- and 2 rows for the `addresses_bronze` view 
+  - The first row will find a city, the second won't so should result in city being set to OTHER.
+
+```yaml
+unit_tests:
+  - name: when_no_city_is_mapped_city_should_be_other # this is the unique name of the test
+    model: addresses_silver # name of the model I'm unit testing
+    given: # the mock data for your inputs
+      - input: ref('cities_silver')
+        rows:
+          - {city: 'CITY1'}
+      - input: ref('addresses_bronze')
+        rows:
+          - {company_id: 'id1', address: "addr1,\ncity1, country", total_spend: 1}
+          - {company_id: 'id2', address: "addr2, \ncity2, country", total_spend: 2}
+    expect: # the expected output given the inputs above
+      rows:
+        - {company_id: 'id1', address: "ADDR1,\nCITY1, COUNTRY", total_spend: 1, city: 'CITY1'}
+        - {company_id: 'id2', address: "ADDR2, \nCITY2, COUNTRY", total_spend: 2, city: 'OTHER'}
+```
+
+I can run the unit test with `../run test:unit` to get
+```shell
+% ../run test:unit
+
+Running unit tests
+22:52:03  Running with dbt=1.8.4
+22:52:03  Registered adapter: postgres=1.8.2
+22:52:03  Found 5 models, 6 data tests, 417 macros, 1 unit test
+22:52:03  
+22:52:03  Concurrency: 1 threads (target='dev')
+22:52:03  
+22:52:03  1 of 1 START unit_test addresses_silver::when_no_city_is_mapped_city_should_be_other  [RUN]
+22:52:03  1 of 1 PASS addresses_silver::when_no_city_is_mapped_city_should_be_other ...... [PASS in 0.13s]
+22:52:03  
+22:52:03  Finished running 1 unit test in 0 hours 0 minutes and 0.30 seconds (0.30s).
+22:52:03  
+22:52:03  Completed successfully
+22:52:03  
+22:52:03  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 TOTAL=1
+```
+
+If I want I can run all tests (data and unit) with `../run test`:
+
+```shell
+% ../run test     
+
+Running tests
+22:58:47  Running with dbt=1.8.4
+22:58:47  Registered adapter: postgres=1.8.2
+22:58:48  Found 5 models, 6 data tests, 417 macros, 1 unit test
+22:58:48  
+22:58:48  Concurrency: 1 threads (target='dev')
+22:58:48  
+22:58:48  1 of 7 START test not_null_addresses_silver_address ............................ [RUN]
+22:58:48  1 of 7 PASS not_null_addresses_silver_address .................................. [PASS in 0.09s]
+22:58:48  2 of 7 START test not_null_addresses_silver_city ............................... [RUN]
+22:58:53  2 of 7 PASS not_null_addresses_silver_city ..................................... [PASS in 5.41s]
+22:58:53  3 of 7 START test not_null_addresses_silver_company_id ......................... [RUN]
+22:58:53  3 of 7 PASS not_null_addresses_silver_company_id ............................... [PASS in 0.03s]
+22:58:53  4 of 7 START test not_null_addresses_silver_total_spend ........................ [RUN]
+22:58:53  4 of 7 PASS not_null_addresses_silver_total_spend .............................. [PASS in 0.03s]
+22:58:53  5 of 7 START test not_null_cities_silver_city .................................. [RUN]
+22:58:53  5 of 7 PASS not_null_cities_silver_city ........................................ [PASS in 0.02s]
+22:58:53  6 of 7 START test unique_cities_silver_city .................................... [RUN]
+22:58:53  6 of 7 PASS unique_cities_silver_city .......................................... [PASS in 0.02s]
+22:58:53  7 of 7 START unit_test addresses_silver::when_no_city_is_mapped_city_should_be_other  [RUN]
+22:58:54  7 of 7 PASS addresses_silver::when_no_city_is_mapped_city_should_be_other ...... [PASS in 0.16s]
+22:58:54  
+22:58:54  Finished running 6 data tests, 1 unit test in 0 hours 0 minutes and 5.93 seconds (5.93s).
+22:58:54  
+22:58:54  Completed successfully
+22:58:54  
+22:58:54  Done. PASS=7 WARN=0 ERROR=0 SKIP=0 TOTAL=7
+```
+
+And just for completeness, this is what it looks like if a unit test fails:
+
+```shell
+% ../run test:unit
+
+Running unit tests
+23:00:09  Running with dbt=1.8.4
+23:00:09  Registered adapter: postgres=1.8.2
+23:00:09  Found 5 models, 6 data tests, 417 macros, 1 unit test
+23:00:09  
+23:00:09  Concurrency: 1 threads (target='dev')
+23:00:09  
+23:00:09  1 of 1 START unit_test addresses_silver::when_no_city_is_mapped_city_should_be_other  [RUN]
+23:00:09  1 of 1 FAIL 1 addresses_silver::when_no_city_is_mapped_city_should_be_other .... [FAIL 1 in 0.16s]
+23:00:09  
+23:00:09  Finished running 1 unit test in 0 hours 0 minutes and 0.32 seconds (0.32s).
+23:00:10  
+23:00:10  Completed with 1 error and 0 warnings:
+23:00:10  
+23:00:10  Failure in unit_test when_no_city_is_mapped_city_should_be_other (models/solve_any_data_analysis_problem_ch2/addresses_silver_unit_test.yml)
+23:00:10    
+
+actual differs from expected:
+
+@@,company_id,address                 ,total_spend,city
+→ ,id1       ,"ADDR1,
+CITY1, COUNTRY" ,1          ,CITY1→OTHER
+  ,id2       ,"ADDR2, 
+CITY2, COUNTRY",2          ,OTHER
+
+
+23:00:10  
+23:00:10    compiled code at target/compiled/spike_postgres/models/solve_any_data_analysis_problem_ch2/addresses_silver_unit_test.yml/models/solve_any_data_analysis_problem_ch2/when_no_city_is_mapped_city_should_be_other.sql
+23:00:10  
+23:00:10  Done. PASS=0 WARN=0 ERROR=1 SKIP=0 TOTAL=1
+```
 
 ### Resources:
 - Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
