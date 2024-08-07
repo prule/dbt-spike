@@ -1,28 +1,33 @@
+# See https://docs.getdbt.com/reference/resource-properties/data-tests
 
 version: 2
 
 models:
-  - name: addresses_bronze
+  - name: addresses_silver
     description: "addresses"
     columns:
       - name: company_id
-        description: ""
+        description: "Company"
         data_tests:
           - not_null
       - name: address
-        description: ""
+        description: "Address"
         data_tests:
           - not_null
       - name: total_spend
-        description: ""
+        description: "Total Spend"
+        data_tests:
+          - not_null
+      - name: city
+        description: "Derived city from address"
         data_tests:
           - not_null
 
-  - name: cities_bronze
+  - name: cities_silver
     description: "cities"
     columns:
       - name: city
-        description: ""
+        description: "City"
         data_tests:
           - unique
           - not_null

@@ -1,5 +1,11 @@
 {{ config(schema='silver')}}
 
+-- upper case address
+-- cast total_spend to decimal
+-- match the address to a city from the cities table
+-- remove rows with no address
+-- use OTHER when no match for city
+
 SELECT
     company_id,
     upper(address) as address,

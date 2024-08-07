@@ -19,10 +19,39 @@ case "$1" in
     echo "Loading data"
 
     psql -h localhost -d postgres -U postgres \
+     -c "create schema if not exists dbt_postgres" \
      -c "create table if not exists dbt_postgres.addresses (company_id text, address text, total_spend text)" \
      -c "\copy dbt_postgres.addresses (company_id,address,total_spend)  from '/tmp/data/downloaded/addresses.csv' delimiters ',' CSV header quote as '\"'" \
      -c "create table if not exists dbt_postgres.cities (city text);" \
      -c "\copy dbt_postgres.cities (city)  from '/tmp/data/downloaded/cities.csv' delimiters ',' CSV"
+
+    ;;
+
+  'docs')
+    echo ""
+    echo "Generating documentation"
+    dbt docs generate
+
+    ;;
+
+  'debug')
+    echo ""
+    echo "Checking setup"
+    dbt debug
+
+    ;;
+
+  'run')
+    echo ""
+    echo "Running"
+    dbt run
+
+    ;;
+
+  'test')
+    echo ""
+    echo "Running tests"
+    dbt test
 
     ;;
 
@@ -37,5 +66,6 @@ case "$1" in
 
     echo "$(tput setaf 3)    data:download                            $(tput sgr0)      Download external data to ./data for reference-app-2"
     echo "$(tput setaf 3)    data:load                                $(tput sgr0)      Load data into postgres"
+    echo "$(tput setaf 3)    docs                                     $(tput sgr0)      Generate documentation"
 
 esac
